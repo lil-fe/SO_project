@@ -5,12 +5,26 @@
 #include "fake_os.h"
 
 void FakeOS_init(FakeOS* os) {
-  os->running=0;
   List_init(&os->ready);
   List_init(&os->waiting);
   List_init(&os->processes);
-  os->timer=0;
-  os->schedule_fn=0;
+  os->timer = 0;
+  os->schedule_fn = 0;
+
+  int num_cpus;
+  // Request the user to enter the number of CPUs and validate user input
+  printf("Enter the number of CPUs: ");
+  scanf("%d", &num_cpus);
+  if (num_cpus < 1) {
+    fprintf(stderr, "Invalid input. Using the default value (1 CPU).\n");
+    num_cpus = 1; // Default to 1 CPU
+  }
+  os->num_cpus = num_cpus;
+
+  // Allocate and initialize resources for the specified number of CPUs
+  os->cpus = (FakeCPU*)malloc(sizeof(FakeCPU)*os->num_cpus);
+  for (int i=0; i<num_cpus; i++)
+    os->cpus[i].running_process = 0;
 }
 
 void FakeOS_createProcess(FakeOS* os, FakeProcess* p) {
@@ -60,7 +74,8 @@ void FakeOS_createProcess(FakeOS* os, FakeProcess* p) {
 
 
 
-
+// fa un giro di giostra con lo scopo di far partire il timer
+// scandisce la lista dei processi waiting
 void FakeOS_simStep(FakeOS* os){
   
   printf("************** TIME: %08d **************\n", os->timer);

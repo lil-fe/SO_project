@@ -12,7 +12,7 @@ struct FakeOS;
 typedef void (*ScheduleFn)(struct FakeOS* os, void* args);
 
 typedef struct {
-  //int cpu_id; // Unique CPU identifier
+  int cpu_id; // Unique CPU identifier (debug)
   FakePCB* running_process; // Pointer to the currently running process on the CPU
 } FakeCPU;
 

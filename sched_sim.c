@@ -9,6 +9,10 @@ typedef struct {
   int quantum;
 } SchedRRArgs;
 
+typedef struct {
+  int quantum;
+} SchedDebugArgs;
+
 void schedRR(FakeOS* os, void* args_){
   SchedRRArgs* args=(SchedRRArgs*)args_;
 
@@ -38,12 +42,56 @@ void schedRR(FakeOS* os, void* args_){
   }
 };
 
+/**
+ * Just a debugging schedule_fn.
+*/
+void sched_debug(FakeOS* os, void* args_){
+  SchedDebugArgs* args = (SchedDebugArgs*)args_;
+
+  // Look for the first process in ready. If none, return
+  if (!os->ready.first)
+    return;
+
+  // Look for a free CPU. If none, return
+  int i;
+  for (i=0; i<os->num_cpus; ++i) {
+    if (!os->cpus[i].running_process) {
+      fprintf(stdout, "Good News!. CPU %d is free!\n", i); // debug
+      break;
+    }
+  }
+  if (i == os->num_cpus) {
+    fprintf(stdout, "None of the CPUs is free.\n"); //debug
+    return;
+  }
+
+  FakePCB* pcb = (FakePCB*)List_popFront(&os->ready);
+  os->cpus[i].running_process = pcb;
+
+  assert(pcb->events.first);
+  ProcessEvent* e = (ProcessEvent*)pcb->events.first;
+  assert(e->type == CPU);
+
+  if (e->duration > args->quantum) {
+    ProcessEvent* qe = (ProcessEvent*)malloc(sizeof(ProcessEvent));
+    qe->list.prev = qe->list.next = 0;
+    qe->type = CPU;
+    qe->duration = args->quantum;
+    e->duration -= args->quantum;
+    List_pushFront(&pcb->events, (ListItem*)qe);
+  }
+}
+
 int main(int argc, char** argv) {
   FakeOS_init(&os);
-  SchedRRArgs srr_args;
-  srr_args.quantum=5;
-  os.schedule_args=&srr_args;
-  os.schedule_fn=schedRR;
+  //SchedRRArgs srr_args;
+  //srr_args.quantum=5;
+  //os.schedule_args=&srr_args;
+  //os.schedule_fn=schedRR;
+  SchedDebugArgs sdb_args;
+  sdb_args.quantum=5;
+  os.schedule_args=&sdb_args;
+  os.schedule_fn=sched_debug;
   
   for (int i=1; i<argc; ++i){
     FakeProcess new_process;

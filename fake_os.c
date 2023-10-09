@@ -10,6 +10,7 @@
 */
 void FakeOS_init(FakeOS* os) {
   List_init(&os->ready);
+  List_init(&os->ready_tmp);
   List_init(&os->waiting);
   List_init(&os->processes);
   os->timer = 0;
@@ -24,17 +25,16 @@ void FakeOS_init(FakeOS* os) {
     num_cpus = 1; // Default to 1 CPU
   }
 
-  fprintf(stdout,"num_cpus: %d", num_cpus); //debug
+  //fprintf(stdout,"num_cpus: %d", num_cpus); //debug
   os->num_cpus = num_cpus;
-  fprintf(stdout, "os->num_cpus = %d", os->num_cpus); //debug
+  //fprintf(stdout, "os->num_cpus = %d", os->num_cpus); //debug
 
   // Allocate and initialize resources for the specified number of CPUs
   os->cpus = (FakeCPU*)malloc(sizeof(FakeCPU)*os->num_cpus);
   for (i=0; i<num_cpus; ++i) {
-    os->cpus[i].running_process = 0;
     os->cpus[i].cpu_id = i; // debug
+    os->cpus[i].running_process = 0;
   }
-    
 }
 
 void FakeOS_createProcess(FakeOS* os, FakeProcess* p) {
@@ -71,6 +71,8 @@ void FakeOS_createProcess(FakeOS* os, FakeProcess* p) {
   ProcessEvent* e=(ProcessEvent*)new_pcb->events.first;
   switch(e->type){
   case CPU:
+    new_pcb->predicted_quantum = 0;
+    new_pcb->is_predicted = 0;
     List_pushBack(&os->ready, (ListItem*) new_pcb);
     break;
   case IO:
@@ -170,40 +172,31 @@ void FakeOS_simStep(FakeOS* os){
         if (! running->events.first) {
           printf("\t\tend process\n");
           free(running); // kill process
-          //os->cpus[i].running_process=0; // Free the CPU deb
         } else {
           e=(ProcessEvent*) running->events.first;
           switch (e->type){
           case CPU:
             printf("\t\tmove to ready\n");
             List_pushBack(&os->ready, (ListItem*) running);
-            //os->cpus[i].running_process=0; // Free the CPU deb
             break;
           case IO:
             printf("\t\tmove to waiting\n");
             List_pushBack(&os->waiting, (ListItem*) running);
-            //os->cpus[i].running_process=0; // Free the CPU deb
             break;
           }
         }
         os->cpus[i].running_process = 0; // Free the CPU
-        //os->running=0;
       }
     }
 
-    // if running not defined and ready queue not empty
-    // put the first in ready to run on the CPUth
-    if (! os->cpus[i].running_process && os->ready.first) {
+    if (!os->cpus[i].running_process && os->ready.first) {
       os->cpus[i].running_process=(FakePCB*) List_popFront(&os->ready);
     }
+    if (os->schedule_fn) {
+      (*os->schedule_fn)(os, os->schedule_args);
+    }
 
-    //sleep(1); // debug
-    //usleep(500000); // debug
-  }
-
-  // call schedule, if defined
-  if (os->schedule_fn && ! os->running){
-    (*os->schedule_fn)(os, os->schedule_args); 
+    sleep(1);
   }
 
   ++os->timer;

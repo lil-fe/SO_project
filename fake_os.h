@@ -2,10 +2,15 @@
 #include "linked_list.h"
 #pragma once
 
+#define A 0.5
+
 typedef struct {
   ListItem list;
   int pid;
   ListHead events;
+
+  int is_predicted;
+  double predicted_quantum;
 } FakePCB;
 
 struct FakeOS;
@@ -26,10 +31,13 @@ typedef struct FakeOS{
 
   ListHead processes;
 
-  FakeCPU* cpus; // Dynamic array of CPUs
+  FakeCPU* cpus; // Array of CPUs
   int num_cpus; // Number of CPUs in the system
+  ListHead ready_tmp;
 } FakeOS;
 
 void FakeOS_init(FakeOS* os);
 void FakeOS_simStep(FakeOS* os);
 void FakeOS_destroy(FakeOS* os);
+
+int is_any_cpu_free(FakeOS* os);

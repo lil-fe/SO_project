@@ -7,92 +7,59 @@ FakeOS os;
 
 typedef struct {
   int quantum;
-} SchedRRArgs;
+} SchedSJFArgs;
 
-typedef struct {
-  int quantum;
-} SchedDebugArgs;
 
-void schedRR(FakeOS* os, void* args_){
-  SchedRRArgs* args=(SchedRRArgs*)args_;
+int is_any_cpu_free(FakeOS* os) {
+  for (int i=0; i<os->num_cpus; i++) {
+    if (!os->cpus[i].running_process) {
+      return 1;
+    }
+  }
+  return 0;
+}
 
-  // look for the first process in ready
-  // if none, return
-  if (! os->ready.first)
-    return;
+void schedSJF(FakeOS* os, void* args_) {
+  SchedSJFArgs* args = (SchedSJFArgs*)args_;
+  FakePCB* shortestJob = (FakePCB*)os->ready.first;
 
-  FakePCB* pcb=(FakePCB*) List_popFront(&os->ready);
-  os->running=pcb;
-  
-  assert(pcb->events.first);
-  ProcessEvent* e = (ProcessEvent*)pcb->events.first;
-  assert(e->type==CPU);
+  // Controllo del processo con predicted_quantum più basso
+  FakePCB* pcb = NULL;
+  ListItem* aux = os->ready.first;
+  while (aux) {
+    pcb = (FakePCB*) aux;
 
-  // look at the first event
-  // if duration>quantum
-  // push front in the list of event a CPU event of duration quantum
-  // alter the duration of the old event subtracting quantum
+    // Se il predicted quantum è già stato calcolato, non calcolarlo di nuovo
+    if (!pcb->is_predicted) {
+      pcb->is_predicted=1;
+      pcb->predicted_quantum = A*args->quantum * (1-A)*pcb->predicted_quantum;
+    }
+    if (!shortestJob->is_predicted) {
+      shortestJob->is_predicted=1;
+      shortestJob->predicted_quantum = A*args->quantum * (1-A)*shortestJob->predicted_quantum;
+    }
+
+    if (pcb->predicted_quantum < shortestJob->predicted_quantum)
+      shortestJob = pcb;
+    aux = aux->next;
+  }
+
+  ProcessEvent* e = (ProcessEvent*)shortestJob->events.first;
   if (e->duration>args->quantum) {
-    ProcessEvent* qe=(ProcessEvent*)malloc(sizeof(ProcessEvent));
+    ProcessEvent* qe = (ProcessEvent*)malloc(sizeof(ProcessEvent));
     qe->list.prev=qe->list.next=0;
     qe->type=CPU;
     qe->duration=args->quantum;
     e->duration-=args->quantum;
-    List_pushFront(&pcb->events, (ListItem*)qe);
+    List_pushFront(&shortestJob->events,(ListItem*)qe);
   }
-};
-
-/**
- * Just a debugging schedule_fn.
-*/
-void sched_debug(FakeOS* os, void* args_){
-  SchedDebugArgs* args = (SchedDebugArgs*)args_;
-
-  // Look for the first process in ready. If none, return
-  if (!os->ready.first)
-    return;
-
-  // Look for a free CPU. If none, return
-  int i;
-  for (i=0; i<os->num_cpus; ++i) {
-    if (!os->cpus[i].running_process) {
-      fprintf(stdout, "Good News!. CPU %d is free!\n", i); // debug
-      break;
-    }
-  }
-  if (i == os->num_cpus) {
-    fprintf(stdout, "None of the CPUs is free.\n"); //debug
-    return;
-  }
-
-  FakePCB* pcb = (FakePCB*)List_popFront(&os->ready);
-  os->cpus[i].running_process = pcb;
-
-  assert(pcb->events.first);
-  ProcessEvent* e = (ProcessEvent*)pcb->events.first;
-  assert(e->type == CPU);
-
-  if (e->duration > args->quantum) {
-    ProcessEvent* qe = (ProcessEvent*)malloc(sizeof(ProcessEvent));
-    qe->list.prev = qe->list.next = 0;
-    qe->type = CPU;
-    qe->duration = args->quantum;
-    e->duration -= args->quantum;
-    List_pushFront(&pcb->events, (ListItem*)qe);
-  }
+  
+  shortestJob->is_predicted=0;
+  shortestJob->predicted_quantum=0;
 }
 
 int main(int argc, char** argv) {
   FakeOS_init(&os);
-  //SchedRRArgs srr_args;
-  //srr_args.quantum=5;
-  //os.schedule_args=&srr_args;
-  //os.schedule_fn=schedRR;
-  SchedDebugArgs sdb_args;
-  sdb_args.quantum=5;
-  os.schedule_args=&sdb_args;
-  os.schedule_fn=sched_debug;
-  
   for (int i=1; i<argc; ++i){
     FakeProcess new_process;
     int num_events=FakeProcess_load(&new_process, argv[i]);
@@ -104,8 +71,15 @@ int main(int argc, char** argv) {
       List_pushBack(&os.processes, (ListItem*)new_process_ptr);
     }
   }
+
+  SchedSJFArgs args;
+  printf("\nEnter the quantum: ");
+  scanf("%d", &args.quantum);
+  os.schedule_args=&args;
+  os.schedule_fn=schedSJF;
+
   printf("num processes in queue %d\n", os.processes.size);
-  while(os.running
+  while(!is_any_cpu_free(&os)
         || os.ready.first
         || os.waiting.first
         || os.processes.first){

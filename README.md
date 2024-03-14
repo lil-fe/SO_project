@@ -8,4 +8,4 @@ _Modify the scheduling simulator presented at lesson to handle:_
 **Completed tasks**
 
 - [x] multiple (configurable) cpus
-- [ ] PSJF with quantum prediction q(t+1) = a * q_current + (1-a) * q(t)
+- [x] PSJF with quantum prediction q(t+1) = a * q_current + (1-a) * q(t)

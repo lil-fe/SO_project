@@ -6,83 +6,49 @@
 FakeOS os;
 
 typedef struct {
-  int quantum;
-} SchedSJFArgs;
+    int quantum;
+} SchedRRArgs;
 
+void schedRR(FakeOS* os, void *args_, int cpu_index) {
+    SchedRRArgs* args = (SchedRRArgs*) args_;
+    if (!os->ready.first) return;   /* no ready processes */
+    FakePCB* pcb = (FakePCB*) List_popFront(&os->ready);    /* get first ready process */
+    os->cpus[cpu_index].running = pcb;          /* assign the currently running process to the CPU */
+    assert(pcb->events.first);  /* check it has at least an event */
+    ProcessEvent* e = (ProcessEvent*) pcb->events.first;
+    assert(e->type == CPU);
 
-int is_any_cpu_free(FakeOS* os) {
-  for (int i=0; i<os->num_cpus; i++) {
-    if (!os->cpus[i].running_process) {
-      return 1;
+    /* if e->duration > quantum, then prepend to the events' list of this process 
+     * a CPU event of duration quantum,
+     * then alter the duration of the old event subtracting quantum */
+    if (e->duration > args->quantum) {
+        ProcessEvent* qe = (ProcessEvent*) malloc(sizeof(ProcessEvent));
+        qe->list.prev = qe->list.next = 0;
+        qe->type = CPU;
+        qe->duration = args->quantum;
+        e->duration -= args->quantum;
+        List_pushFront(&pcb->events, (ListItem*) qe);
     }
-  }
-  return 0;
 }
 
-void schedSJF(FakeOS* os, void* args_) {
-  SchedSJFArgs* args = (SchedSJFArgs*)args_;
-  FakePCB* shortestJob = (FakePCB*)os->ready.first;
+int main(int argc, char **argv) {
+    FakeOS_init(&os);
+    SchedRRArgs srr_args;
+    srr_args.quantum = 5;
+    os.schedule_args = &srr_args;
+    os.schedule_fn = schedRR;
 
-  // Controllo del processo con predicted_quantum più basso
-  FakePCB* pcb = NULL;
-  ListItem* aux = os->ready.first;
-  while (aux) {
-    pcb = (FakePCB*) aux;
-
-    // Se il predicted quantum è già stato calcolato, non calcolarlo di nuovo
-    if (!pcb->is_predicted) {
-      pcb->is_predicted=1;
-      pcb->predicted_quantum = A*args->quantum * (1-A)*pcb->predicted_quantum;
+    for (int i=1; i < argc; ++i) {
+        FakeProcess new_process;
+        int num_events = FakeProcess_load(&new_process, argv[i]);
+        printf("loading [%s], pid: %d, num_events: %d\n", argv[i], new_process.pid, num_events);
+        if (num_events) {
+            FakeProcess* new_process_ptr = (FakeProcess*) malloc(sizeof(FakeProcess));
+            *new_process_ptr = new_process;
+            List_pushBack(&os.processes, (ListItem*) new_process_ptr);
+        }
     }
-    if (!shortestJob->is_predicted) {
-      shortestJob->is_predicted=1;
-      shortestJob->predicted_quantum = A*args->quantum * (1-A)*shortestJob->predicted_quantum;
-    }
-
-    if (pcb->predicted_quantum < shortestJob->predicted_quantum)
-      shortestJob = pcb;
-    aux = aux->next;
-  }
-
-  ProcessEvent* e = (ProcessEvent*)shortestJob->events.first;
-  if (e->duration>args->quantum) {
-    ProcessEvent* qe = (ProcessEvent*)malloc(sizeof(ProcessEvent));
-    qe->list.prev=qe->list.next=0;
-    qe->type=CPU;
-    qe->duration=args->quantum;
-    e->duration-=args->quantum;
-    List_pushFront(&shortestJob->events,(ListItem*)qe);
-  }
-  
-  shortestJob->is_predicted=0;
-  shortestJob->predicted_quantum=0;
-}
-
-int main(int argc, char** argv) {
-  FakeOS_init(&os);
-  for (int i=1; i<argc; ++i){
-    FakeProcess new_process;
-    int num_events=FakeProcess_load(&new_process, argv[i]);
-    printf("loading [%s], pid: %d, events:%d",
-           argv[i], new_process.pid, num_events);
-    if (num_events) {
-      FakeProcess* new_process_ptr=(FakeProcess*)malloc(sizeof(FakeProcess));
-      *new_process_ptr=new_process;
-      List_pushBack(&os.processes, (ListItem*)new_process_ptr);
-    }
-  }
-
-  SchedSJFArgs args;
-  printf("\nEnter the quantum: ");
-  scanf("%d", &args.quantum);
-  os.schedule_args=&args;
-  os.schedule_fn=schedSJF;
-
-  printf("num processes in queue %d\n", os.processes.size);
-  while(!is_any_cpu_free(&os)
-        || os.ready.first
-        || os.waiting.first
-        || os.processes.first){
-    FakeOS_simStep(&os);
-  }
+    printf("num processes in queue %d\n", os.processes.size);
+    while(!is_any_cpu_free(&os) || os.ready.first || os.waiting.first || os.processes.first)
+        FakeOS_simStep(&os);
 }

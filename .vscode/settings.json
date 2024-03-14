@@ -1,0 +1,9 @@
+{
+    "discord.enabled": false,
+    "files.associations": {
+        "*.embeddedhtml": "html",
+        "linked_list.h": "c",
+        "fake_process.h": "c",
+        "fake_os.h": "c"
+    }
+}

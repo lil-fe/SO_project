@@ -1,8 +1,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
-
+#include <float.h>
 #include "fake_os.h"
+
+#define A 0.1
 
 void FakeOS_init(FakeOS* os) {
     os->running = 0;
@@ -14,7 +16,6 @@ void FakeOS_init(FakeOS* os) {
 
     int num_cpus;
     printf("enter the number of CPUS: ");
-    //scanf("%d", &(os->num_cpus));
     scanf("%d", &num_cpus);
     if (num_cpus < 1) num_cpus = 1;     /* default to 1 CPU */
     os->num_cpus = num_cpus;
@@ -45,6 +46,7 @@ void FakeOS_createProcess(FakeOS* os, FakeProcess* p) {
     new_pcb->list.next = new_pcb->list.prev = 0;
     new_pcb->pid = p->pid;
     new_pcb->events = p->events;
+    new_pcb->actual_burst = new_pcb->predicted_burst = 0;
     assert(new_pcb->events.first && "process without events");
 
     // depending on the first event's type, we put the process in either ready or waiting
@@ -127,6 +129,7 @@ void FakeOS_simStep(FakeOS* os) {
             ProcessEvent* e = (ProcessEvent*) running->events.first;
             assert(e->type == CPU);
             e->duration--;
+            ++running->actual_burst; /* (fix) when the process leaves running, we need this */
             printf("\t\tremaining time: %d\n", e->duration);
             if (e->duration == 0) {     /* if the event is over */
                 printf("\t\tend burst\n");
@@ -155,31 +158,6 @@ void FakeOS_simStep(FakeOS* os) {
             (*os->schedule_fn)(os, os->schedule_args, i);
         if (!cpu->running && os->ready.first)
             cpu->running = (FakePCB*) List_popFront(&os->ready);
-        /*if (!cpu->running && os->waiting.first) {
-            FakePCB* pcb = (FakePCB*) os->waiting.first;
-            ProcessEvent* e = (ProcessEvent*) pcb->events.first;
-            assert(e->type == IO);
-            e->duration = 0;    //skip the IO burst, since there's at least a free CPU
-            List_popFront(&pcb->events);
-            free(e);
-            List_detach(&os->waiting, (ListItem*) pcb);
-            if (!pcb->events.first) {   // no further events
-                printf("\t\tend process\n"); 
-                free(pcb);
-            } else {    // take the next event and check it
-                e = (ProcessEvent*) pcb->events.first;
-                switch (e->type) {
-                case CPU:
-                    printf("\t\tmove to ready\n");
-                    List_pushBack(&os->ready, (ListItem*) pcb);
-                    break;
-                case IO:
-                    printf("\t\tmove to waiting\n");
-                    List_pushBack(&os->waiting, (ListItem*) pcb);
-                    break;
-                }
-            }
-        } */
     }
 
     ++os->timer;
@@ -191,4 +169,31 @@ int is_any_cpu_free(FakeOS* os) {
     for (int i=0; i < os->num_cpus; ++i)
         if (!os->cpus[i].running) return 1;
     return 0;
+}
+
+/* A: the weight given to the actual burst time;
+ * actual_burst: the actual burst time of the process;
+ * predicted_burst: the previously predicted burst time, namely at time t.
+ * The prediction result is the predicted burst at time t+1. */
+float prediction(FakePCB* pcb) {
+    if (!pcb->predicted_burst)
+        return A*pcb->actual_burst + (1-A)*pcb->predicted_burst;
+    return pcb->predicted_burst;
+}
+
+FakePCB* findShortestJob(ListHead* ready) {
+    FakePCB* shortest_job = 0;
+    float shortest_burst = FLT_MAX;
+    ListItem* aux = ready->first;
+    while (aux) {
+        FakePCB* pcb = (FakePCB*) aux;
+        float predicted_burst = prediction(pcb);
+        printf("\t[pid %d] predicted_burst: %.2f\n", pcb->pid, predicted_burst);
+        if (predicted_burst < shortest_burst) {
+            shortest_burst = predicted_burst;
+            shortest_job = pcb;
+        }
+        aux = aux->next;
+    }
+    return shortest_job;
 }

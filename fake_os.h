@@ -2,10 +2,13 @@
 #include "linked_list.h"
 #pragma once
 
-typedef struct FakePCB {
+typedef struct {
     ListItem list;
     int pid;
     ListHead events;
+
+    float actual_burst;
+    float predicted_burst;
 } FakePCB;
 
 struct FakeOS;
@@ -32,4 +35,6 @@ void FakeOS_init(FakeOS *os);
 void FakeOS_simStep(FakeOS *os);
 void FakeOS_destroy(FakeOS *os);
 
-int is_any_cpu_free(FakeOS* os);
+int is_any_cpu_free(FakeOS*);
+float prediction(FakePCB*);
+FakePCB* findShortestJob(ListHead* ready);

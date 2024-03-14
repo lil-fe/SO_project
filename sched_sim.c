@@ -7,17 +7,16 @@ FakeOS os;
 
 typedef struct {
     int quantum;
-} SchedRRArgs;
+} SchedSJFArgs;
 
-void schedRR(FakeOS* os, void *args_, int cpu_index) {
-    SchedRRArgs* args = (SchedRRArgs*) args_;
+void schedSJF(FakeOS* os, void *args_, int cpu_index) {
+    SchedSJFArgs* args = (SchedSJFArgs*) args_;
     if (!os->ready.first) return;   /* no ready processes */
-    FakePCB* pcb = (FakePCB*) List_popFront(&os->ready);    /* get first ready process */
-    os->cpus[cpu_index].running = pcb;          /* assign the currently running process to the CPU */
-    assert(pcb->events.first);  /* check it has at least an event */
-    ProcessEvent* e = (ProcessEvent*) pcb->events.first;
-    assert(e->type == CPU);
-
+    FakePCB* shortest_job = findShortestJob(&os->ready);
+    if (!shortest_job) return;      /* no process found */
+    os->cpus[cpu_index].running = shortest_job; 
+    List_detach(&os->ready, (ListItem*) shortest_job);
+    ProcessEvent* e = (ProcessEvent*)shortest_job->events.first;
     /* if e->duration > quantum, then prepend to the events' list of this process 
      * a CPU event of duration quantum,
      * then alter the duration of the old event subtracting quantum */
@@ -27,16 +26,16 @@ void schedRR(FakeOS* os, void *args_, int cpu_index) {
         qe->type = CPU;
         qe->duration = args->quantum;
         e->duration -= args->quantum;
-        List_pushFront(&pcb->events, (ListItem*) qe);
+        List_pushFront(&shortest_job->events, (ListItem*) qe);
     }
 }
 
 int main(int argc, char **argv) {
     FakeOS_init(&os);
-    SchedRRArgs srr_args;
-    srr_args.quantum = 5;
-    os.schedule_args = &srr_args;
-    os.schedule_fn = schedRR;
+    SchedSJFArgs sjf_args;
+    sjf_args.quantum = 5;
+    os.schedule_args = &sjf_args;
+    os.schedule_fn = schedSJF;
 
     for (int i=1; i < argc; ++i) {
         FakeProcess new_process;

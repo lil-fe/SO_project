@@ -176,8 +176,8 @@ int is_any_cpu_free(FakeOS* os) {
  * The prediction result is the predicted burst at time t+1. */
 float prediction(FakePCB* pcb) {
     if (!pcb->predicted_burst)
-        return A*pcb->actual_burst + (1-A)*pcb->predicted_burst;
-    return pcb->predicted_burst;
+        pcb->predicted_burst = pcb->actual_burst;
+    return A*pcb->predicted_burst + (1-A)*pcb->actual_burst;
 }
 
 FakePCB* findShortestJob(ListHead* ready) {
@@ -202,7 +202,7 @@ FakePCB* findShortestJob(ListHead* ready) {
     /*printf("\t[debug] shortest_job->actual_burst = %.2f of [pid %d]\n",
             shortest_job->actual_burst, shortest_job->pid); */
     if (shortest_job->actual_burst != 0)
-        printf("\t\t\tshortest job : %d\n", shortest_job->pid);
+        printf("\t\t\tshortest job: [pid %d]\n", shortest_job->pid);
     return shortest_job;
 }
 
@@ -211,8 +211,7 @@ void print_ready_processes(ListHead* ready) {
     ListItem* aux = ready->first;
     while (aux) {
         FakePCB* pcb = (FakePCB*) aux;
-        printf("\t\t[pid %d] ", pcb->pid);
+        printf("\t\t[pid %d]\n", pcb->pid);
         aux = aux->next;
     }
-    printf("\n");
 }

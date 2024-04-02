@@ -38,3 +38,4 @@ void FakeOS_destroy(FakeOS *os);
 int is_any_cpu_free(FakeOS*);
 float prediction(FakePCB*);
 FakePCB* findShortestJob(ListHead* ready);
+void print_ready_processes(ListHead* ready);

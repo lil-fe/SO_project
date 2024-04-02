@@ -4,7 +4,7 @@
 #include <float.h>
 #include "fake_os.h"
 
-#define A 0.1
+#define A 0.3
 
 void FakeOS_init(FakeOS* os) {
     os->running = 0;
@@ -53,10 +53,10 @@ void FakeOS_createProcess(FakeOS* os, FakeProcess* p) {
     ProcessEvent* e = (ProcessEvent*) new_pcb->events.first;
     switch(e->type) {
     case CPU:
-        List_pushBack(&os->ready, (ListItem*) new_pcb);   /* append e to running processes' list */
+        List_pushBack(&os->ready, (ListItem*) new_pcb);   /* append e to running processes list */
         break;
     case IO:
-        List_pushBack(&os->waiting, (ListItem*) new_pcb); /* append e to waiting processes' list */
+        List_pushBack(&os->waiting, (ListItem*) new_pcb); /* append e to waiting processes list */
         break;
     default:
         assert(0 && "illegal resource");
@@ -74,7 +74,7 @@ void FakeOS_simStep(FakeOS* os) {
         FakeProcess* new_process = 0;
         if (proc->arrival_time == os->timer) new_process = proc;
         aux = aux->next;
-        if (new_process) {  /* remove new_process from processes' list and create it in the OS */
+        if (new_process) {  /* remove new_process from processes list and create it in the OS */
             printf("\tcreate pid:%d\n", new_process->pid);
             new_process = (FakeProcess*) List_detach(&os->processes, (ListItem*) new_process);
             FakeOS_createProcess(os, new_process);
@@ -116,11 +116,9 @@ void FakeOS_simStep(FakeOS* os) {
         }
     }
     
-    FakeCPU* cpu = 0;
-    FakePCB* running = 0;
     for (int i=0; i < os->num_cpus; ++i) {
-        cpu = &os->cpus[i];
-        running = cpu->running;
+        FakeCPU* cpu = &os->cpus[i];
+        FakePCB* running = cpu->running;
         printf("\trunning pid: %d [CPU %d]\n", running ? running->pid : -1, i);
         // decrement the duration of running
         // if the event is over, then destroy it and reschedule the process
@@ -129,7 +127,7 @@ void FakeOS_simStep(FakeOS* os) {
             ProcessEvent* e = (ProcessEvent*) running->events.first;
             assert(e->type == CPU);
             e->duration--;
-            ++running->actual_burst; /* (fix) when the process leaves running, we need this */
+            ++running->actual_burst; /* when leaves running, we need it to compute the prediction */
             printf("\t\tremaining time: %d\n", e->duration);
             if (e->duration == 0) {     /* if the event is over */
                 printf("\t\tend burst\n");
@@ -139,7 +137,7 @@ void FakeOS_simStep(FakeOS* os) {
                     printf("\t\tend process\n");
                     free(running);  /* kill process */
                 } else {    /* the ended event wasn't the last one */
-                    e = (ProcessEvent*) running->events.first;
+                    e = (ProcessEvent*) running->events.first; /* take the next event */
                     switch(e->type) {
                     case CPU:
                         printf("\t\tmove to ready\n");
@@ -154,12 +152,13 @@ void FakeOS_simStep(FakeOS* os) {
                 cpu->running = 0;
             }
         }
-        if (os->schedule_fn && !cpu->running)
+        if (os->schedule_fn && os->ready.first)
             (*os->schedule_fn)(os, os->schedule_args, i);
         if (!cpu->running && os->ready.first)
             cpu->running = (FakePCB*) List_popFront(&os->ready);
     }
-
+    
+    print_ready_processes(&os->ready);
     ++os->timer;
 }
 
@@ -188,12 +187,32 @@ FakePCB* findShortestJob(ListHead* ready) {
     while (aux) {
         FakePCB* pcb = (FakePCB*) aux;
         float predicted_burst = prediction(pcb);
-        printf("\t[pid %d] predicted_burst: %.2f\n", pcb->pid, predicted_burst);
+        
+        if (predicted_burst != 0)
+            printf("\t\t[pid %d] predicted_burst: %.2f\n", pcb->pid, predicted_burst);
+        
         if (predicted_burst < shortest_burst) {
             shortest_burst = predicted_burst;
             shortest_job = pcb;
+            shortest_job->actual_burst = shortest_burst;
         }
         aux = aux->next;
     }
+
+    /*printf("\t[debug] shortest_job->actual_burst = %.2f of [pid %d]\n",
+            shortest_job->actual_burst, shortest_job->pid); */
+    if (shortest_job->actual_burst != 0)
+        printf("\t\t\tshortest job : %d\n", shortest_job->pid);
     return shortest_job;
+}
+
+void print_ready_processes(ListHead* ready) {
+    printf("\t\t##### READY LIST #####\n");
+    ListItem* aux = ready->first;
+    while (aux) {
+        FakePCB* pcb = (FakePCB*) aux;
+        printf("\t\t[pid %d] ", pcb->pid);
+        aux = aux->next;
+    }
+    printf("\n");
 }

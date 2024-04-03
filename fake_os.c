@@ -4,7 +4,7 @@
 #include <float.h>
 #include "fake_os.h"
 
-#define A 0.1
+#define A 0.5
 
 void FakeOS_init(FakeOS* os) {
     os->running = 0;
@@ -192,7 +192,7 @@ FakePCB* findShortestJob(ListHead* ready) {
         if (predicted_burst < shortest_burst) {
             shortest_burst = predicted_burst;
             shortest_job = pcb;
-            shortest_job->actual_burst = shortest_burst;
+            shortest_job->predicted_burst = shortest_burst;
         }
         aux = aux->next;
     }

@@ -33,7 +33,6 @@ void schedSJF(FakeOS* os, void *args_, int cpu_index) {
         if (shortest_job->actual_burst < current_burst->duration
                 && shortest_job->actual_burst > 0) {
             List_pushBack(&os->ready, (ListItem*) running);
-            //shortest_job->actual_burst = 0;
             os->cpus[cpu_index].running = shortest_job;
             List_detach(&os->ready, (ListItem*) shortest_job);
             printf("\t\t\t[CPU %d] assigned to [pid %d], [pid %d] moved to ready \n",
@@ -44,7 +43,7 @@ void schedSJF(FakeOS* os, void *args_, int cpu_index) {
     }
     
     // if no processes are running on this CPU, just assign it to the shortest job.
-    //shortest_job->actual_burst = 0;
+    shortest_job->actual_burst = 0;
     os->cpus[cpu_index].running = shortest_job;
     List_detach(&os->ready, (ListItem*) shortest_job);
 }

@@ -24,6 +24,7 @@ void schedSJF(FakeOS* os, void *args_, int cpu_index) {
         List_pushFront(&shortest_job->events, (ListItem*) qe);
     }
 
+    // if something is running on the CPU
     FakePCB* running = os->cpus[cpu_index].running;
     if (running) {
         ProcessEvent* current_burst = (ProcessEvent*) running->events.first;
@@ -32,6 +33,7 @@ void schedSJF(FakeOS* os, void *args_, int cpu_index) {
         if (shortest_job->actual_burst < current_burst->duration
                 && shortest_job->actual_burst > 0) {
             List_pushBack(&os->ready, (ListItem*) running);
+            //shortest_job->actual_burst = 0;
             os->cpus[cpu_index].running = shortest_job;
             List_detach(&os->ready, (ListItem*) shortest_job);
             printf("\t\t\t[CPU %d] assigned to [pid %d], [pid %d] moved to ready \n",
@@ -42,6 +44,7 @@ void schedSJF(FakeOS* os, void *args_, int cpu_index) {
     }
     
     // if no processes are running on this CPU, just assign it to the shortest job.
+    //shortest_job->actual_burst = 0;
     os->cpus[cpu_index].running = shortest_job;
     List_detach(&os->ready, (ListItem*) shortest_job);
 }
@@ -64,6 +67,6 @@ int main(int argc, char **argv) {
         }
     }
     printf("num processes in queue %d\n", os.processes.size);
-    while(!is_any_cpu_free(&os) || os.ready.first || os.waiting.first || os.processes.first)
+    while(is_any_cpu_running(&os) || os.ready.first || os.waiting.first || os.processes.first)
         FakeOS_simStep(&os);
 }

@@ -4,7 +4,7 @@
 #include <float.h>
 #include "fake_os.h"
 
-#define A 0.3
+#define A 0.1
 
 void FakeOS_init(FakeOS* os) {
     os->running = 0;
@@ -53,7 +53,7 @@ void FakeOS_createProcess(FakeOS* os, FakeProcess* p) {
     ProcessEvent* e = (ProcessEvent*) new_pcb->events.first;
     switch(e->type) {
     case CPU:
-        List_pushBack(&os->ready, (ListItem*) new_pcb);   /* append e to running processes list */
+        List_pushBack(&os->ready, (ListItem*) new_pcb);   /* append e to ready processes list */
         break;
     case IO:
         List_pushBack(&os->waiting, (ListItem*) new_pcb); /* append e to waiting processes list */
@@ -82,7 +82,7 @@ void FakeOS_simStep(FakeOS* os) {
         }
     }
 
-    // scan waiting list and set ready all the processes whose event terminates
+    // scan waiting list and handle all the processes whose event terminates
     aux = os->waiting.first;
     while(aux) {
         FakePCB* pcb = (FakePCB*) aux;  /* create PCB for the waiting process */
@@ -154,8 +154,6 @@ void FakeOS_simStep(FakeOS* os) {
         }
         if (os->schedule_fn && os->ready.first)
             (*os->schedule_fn)(os, os->schedule_args, i);
-        if (!cpu->running && os->ready.first)
-            cpu->running = (FakePCB*) List_popFront(&os->ready);
     }
     
     print_ready_processes(&os->ready);
@@ -164,9 +162,9 @@ void FakeOS_simStep(FakeOS* os) {
 
 void FakeOS_destroy(FakeOS* os) {}
 
-int is_any_cpu_free(FakeOS* os) {
+int is_any_cpu_running(FakeOS* os) {
     for (int i=0; i < os->num_cpus; ++i)
-        if (!os->cpus[i].running) return 1;
+        if (os->cpus[i].running) return 1;
     return 0;
 }
 

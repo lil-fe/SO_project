@@ -49,14 +49,13 @@ void FakeOS_createProcess(FakeOS* os, FakeProcess* p) {
     new_pcb->actual_burst = new_pcb->predicted_burst = 0;
     assert(new_pcb->events.first && "process without events");
 
-    // depending on the first event's type, we put the process in either ready or waiting
     ProcessEvent* e = (ProcessEvent*) new_pcb->events.first;
     switch(e->type) {
     case CPU:
-        List_pushBack(&os->ready, (ListItem*) new_pcb);   /* append e to ready processes list */
+        List_pushBack(&os->ready, (ListItem*) new_pcb);
         break;
     case IO:
-        List_pushBack(&os->waiting, (ListItem*) new_pcb); /* append e to waiting processes list */
+        List_pushBack(&os->waiting, (ListItem*) new_pcb);
         break;
     default:
         assert(0 && "illegal resource");
@@ -152,11 +151,11 @@ void FakeOS_simStep(FakeOS* os) {
                 cpu->running = 0;
             }
         }
-        if (os->schedule_fn && os->ready.first)
+        if (os->schedule_fn && os->ready.first && !cpu->running)
             (*os->schedule_fn)(os, os->schedule_args, i);
     }
     
-    print_ready_processes(&os->ready);
+    //print_ready_processes(&os->ready);
     ++os->timer;
 }
 
@@ -213,3 +212,92 @@ void print_ready_processes(ListHead* ready) {
         aux = aux->next;
     }
 }
+
+/* 
+ * Randomically generate CPU and IO bursts for process with id pid
+ * and write them to a file. 
+ */
+void generate_file(int pid, int num_bursts, const char* filename) {
+    FILE* f = fopen(filename, "w");
+    if (!f) return;
+   
+    int arrival_time = rand() % 5;
+    fprintf(f, "PROCESS %d %d\n", pid, arrival_time);
+    for (int i=0; i < num_bursts/2; ++i) {
+        int cpu_burst = rand() % MAX_QUANTUM+1;
+        fprintf(f, "CPU_BURST %d\n", cpu_burst);
+        int io_burst = rand() % MAX_QUANTUM+1;
+        fprintf(f, "IO_BURST %d\n", io_burst);
+    }
+
+    fclose(f);
+}
+
+/*
+ * Generates samples of CPU and IO bursts for the process p and
+ * writes them to a file. Each burst duration is randomly sampled based
+ * on their cumulative probability distributions.
+ */
+void generate_samples(FakeProcess* p, int num_bursts) {
+    char filename[50];
+    sprintf(filename, "processes/sampled_p%d.txt", p->pid);
+    FILE* f = fopen(filename, "w");
+    if (!f) return;
+    
+    fseek(f, 0, SEEK_END);
+    if (!ftell(f)) 
+        fprintf(f, "PROCESS %d %d\n", p->pid, p->arrival_time);
+
+    for(int i=0; i < num_bursts/2; ++i) {
+        double y = (double) rand() / RAND_MAX;
+        if (y < p->cpu_nd[0]) {
+            fprintf(f, "CPU_BURST\t%d\n", 1);
+            goto io;
+        }
+        for (int j=1; j < MAX_QUANTUM; ++j) {
+            double y1 = p->cpu_nd[j-1];
+            double y2 = p->cpu_nd[j];
+            if (y1<y && y<y2) {
+                fprintf(f, "CPU_BURST\t%d\n", j+1);
+                break;
+            }
+        }
+io:
+        y = (double) rand() / RAND_MAX;
+        if (y < p->io_nd[0]) {
+            fprintf(f, "IO_BURST\t%d\n", 1);
+            continue;
+        }
+        for (int j=1; j < MAX_QUANTUM; ++j) {
+            double y1 = p->io_nd[j-1];
+            double y2 = p->io_nd[j];
+            if (y<y1 || (y1<y && y<y2)) {
+                fprintf(f, "IO_BURST\t%d\n", j+1);
+                break;
+            }
+        }
+    }
+
+    fclose(f);
+}
+
+void print_array(const void* array, char type) {
+    if (!array) return;
+    
+    printf("[");
+    if (type == 'd') {
+        double* aux = (double*) array;
+        for (int i=0; i<MAX_QUANTUM; ++i) {
+            printf("%.3f", aux[i]);
+            if (i < MAX_QUANTUM-1) printf(", ");
+        }
+    } else if (type == 'i') {
+        int* aux = (int*) array;
+        for (int i=0; i<MAX_QUANTUM; ++i) {
+            printf("%d", aux[i]);
+            if (i < MAX_QUANTUM-1) printf(", ");
+        }
+    }
+    printf("]\n");
+}
+

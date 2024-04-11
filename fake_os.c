@@ -15,12 +15,22 @@ void FakeOS_init(FakeOS* os) {
     os->schedule_fn = 0;
 
     int num_cpus;
-    printf("enter the number of CPUS: ");
+    printf("enter the number of CPUs: ");
     scanf("%d", &num_cpus);
-    if (num_cpus < 1) num_cpus = 1;     /* default to 1 CPU */
+    if (num_cpus < 1) { /* default to 1 CPU */
+        fprintf(stderr, "%d CPUs are not allowed; "
+                "1 CPU has been allocated\n", num_cpus);
+        num_cpus = 1;
+    }
     os->num_cpus = num_cpus;
     os->cpus = (FakeCPU*) malloc(sizeof(FakeCPU) * os->num_cpus);
     for (int i=0; i < num_cpus; ++i) os->cpus[i].running = 0;
+   
+    int num_bursts; 
+    printf("enter the number of bursts that each process should compute: ");
+    scanf(" %d", &num_bursts);
+    assert(num_bursts > 0 && "a negative number of events is not feasible");
+    os->num_bursts = num_bursts;
 }
 
 void FakeOS_createProcess(FakeOS* os, FakeProcess* p) {
@@ -217,16 +227,17 @@ void print_ready_processes(ListHead* ready) {
  * Randomically generate CPU and IO bursts for process with id pid
  * and write them to a file. 
  */
-void generate_file(int pid, int num_bursts, const char* filename) {
+void generate_file(const char* filename, int pid, int num_bursts,
+        int max_quantum) {
     FILE* f = fopen(filename, "w");
     if (!f) return;
    
     int arrival_time = rand() % 5;
     fprintf(f, "PROCESS %d %d\n", pid, arrival_time);
     for (int i=0; i < num_bursts/2; ++i) {
-        int cpu_burst = rand() % MAX_QUANTUM+1;
+        int cpu_burst = rand() % max_quantum+1;
         fprintf(f, "CPU_BURST %d\n", cpu_burst);
-        int io_burst = rand() % MAX_QUANTUM+1;
+        int io_burst = rand() % max_quantum+1;
         fprintf(f, "IO_BURST %d\n", io_burst);
     }
 
@@ -254,7 +265,7 @@ void generate_samples(FakeProcess* p, int num_bursts) {
             fprintf(f, "CPU_BURST\t%d\n", 1);
             goto io;
         }
-        for (int j=1; j < MAX_QUANTUM; ++j) {
+        for (int j=1; j < p->max_quantum; ++j) {
             double y1 = p->cpu_nd[j-1];
             double y2 = p->cpu_nd[j];
             if (y1<y && y<y2) {
@@ -268,7 +279,7 @@ io:
             fprintf(f, "IO_BURST\t%d\n", 1);
             continue;
         }
-        for (int j=1; j < MAX_QUANTUM; ++j) {
+        for (int j=1; j < p->max_quantum; ++j) {
             double y1 = p->io_nd[j-1];
             double y2 = p->io_nd[j];
             if (y<y1 || (y1<y && y<y2)) {
@@ -280,24 +291,3 @@ io:
 
     fclose(f);
 }
-
-void print_array(const void* array, char type) {
-    if (!array) return;
-    
-    printf("[");
-    if (type == 'd') {
-        double* aux = (double*) array;
-        for (int i=0; i<MAX_QUANTUM; ++i) {
-            printf("%.3f", aux[i]);
-            if (i < MAX_QUANTUM-1) printf(", ");
-        }
-    } else if (type == 'i') {
-        int* aux = (int*) array;
-        for (int i=0; i<MAX_QUANTUM; ++i) {
-            printf("%d", aux[i]);
-            if (i < MAX_QUANTUM-1) printf(", ");
-        }
-    }
-    printf("]\n");
-}
-

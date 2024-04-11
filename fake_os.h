@@ -29,6 +29,7 @@ typedef struct FakeOS {
     
     FakeCPU* cpus;              /* list of cpus */
     int num_cpus;
+    int num_bursts;             /* number of bursts to be generated */
 } FakeOS;
 
 void FakeOS_init(FakeOS *os);
@@ -38,9 +39,8 @@ void FakeOS_destroy(FakeOS *os);
 int is_any_cpu_running(FakeOS*);
 float prediction(FakePCB*);
 FakePCB* findShortestJob(ListHead* ready);
-
 void print_ready_processes(ListHead* ready);
-void print_array(const void* array, char type);
 
-void generate_file(int pid, int num_bursts, const char* filename);
+void generate_file(const char* filename, int pid, int num_bursts, 
+        int max_quantum);
 void generate_samples(FakeProcess* p, int num_bursts);

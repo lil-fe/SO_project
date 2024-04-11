@@ -5,11 +5,11 @@
 
 #define LINE_LENGTH 1024
 
-static void datasets_init(FakeProcess* p) {
-    memset(p->cpu_d, 0, MAX_QUANTUM*sizeof(int));
-    memset(p->io_d, 0, MAX_QUANTUM*sizeof(int));
-    memset(p->cpu_nd, 0, MAX_QUANTUM*sizeof(double));
-    memset(p->io_nd, 0, MAX_QUANTUM*sizeof(double));
+static void FakeProcess_init(FakeProcess* p) {
+    p->cpu_d = (int*) calloc(sizeof(int), p->max_quantum);
+    p->io_d = (int*) calloc(sizeof(int), p->max_quantum);
+    p->cpu_nd = (double*) calloc(sizeof(double), p->max_quantum);
+    p->io_nd = (double*) calloc(sizeof(double), p->max_quantum);
 }
 
 /*
@@ -21,15 +21,15 @@ static void datasets_init(FakeProcess* p) {
  */
 static void normalize_datasets(FakeProcess* p) {
     double sum = 0;
-    for (int i=0; i<MAX_QUANTUM; ++i) 
+    for (int i=0; i<p->max_quantum; ++i) 
         sum += p->cpu_d[i];
-    for (int i=0; i<MAX_QUANTUM; ++i) 
+    for (int i=0; i<p->max_quantum; ++i) 
         p->cpu_nd[i] = (double) p->cpu_d[i] / sum;
 
     sum = 0;
-    for (int i=0; i<MAX_QUANTUM; ++i) 
+    for (int i=0; i<p->max_quantum; ++i) 
         sum += p->io_d[i];
-    for (int i=0; i<MAX_QUANTUM; ++i) 
+    for (int i=0; i<p->max_quantum; ++i) 
         p->io_nd[i] = (double) p->io_d[i] / sum;
 }
 
@@ -38,54 +38,64 @@ static void normalize_datasets(FakeProcess* p) {
  * based on their normalized probability distributions.
  */
 static void cumulative_distributions(FakeProcess* p) {
-    double cpu_tmp[MAX_QUANTUM];
-    double io_tmp[MAX_QUANTUM];
-    memcpy(cpu_tmp, p->cpu_nd, sizeof(double)*MAX_QUANTUM);
-    memcpy(io_tmp, p->io_nd, sizeof(double)*MAX_QUANTUM);
+    double cpu_tmp[p->max_quantum];
+    double io_tmp[p->max_quantum];
+    memcpy(cpu_tmp, p->cpu_nd, sizeof(double)*p->max_quantum);
+    memcpy(io_tmp, p->io_nd, sizeof(double)*p->max_quantum);
 
     double cumulative_sum = cpu_tmp[0];
-    for (int i=1; i < MAX_QUANTUM; ++i) {
+    for (int i=1; i < p->max_quantum; ++i) {
         cumulative_sum += cpu_tmp[i];
         p->cpu_nd[i] = cumulative_sum;
     }
     cumulative_sum = io_tmp[0];
-    for (int i=1; i < MAX_QUANTUM; ++i) {
+    for (int i=1; i < p->max_quantum; ++i) {
         cumulative_sum += io_tmp[i];
         p->io_nd[i] = cumulative_sum;
     }
 }
 
-static void print_histogram(const void* array, char type) {
-    if (type == 'i') {
-        int* arr = (int*) array;
-        for (int i=0; i<MAX_QUANTUM; ++i) {
-            printf("quantum %d:\t", i+1);
-            int cnt=0;
-            for (int j=0; j<arr[i]; ++j) { printf("@"); cnt++; }
-            if (cnt < 8) printf("\t");
-            printf("\t%d\n", cnt);
-        }
-    } else if (type == 'd') {
-        double* arr = (double*) array;
-        for (int i=0; i<MAX_QUANTUM; ++i) {
-            printf("quantum %d:\t", i+1);
-            printf("%.2f\n", arr[i]);
-        }
-    } else {
-        printf("could not print histogram of type %c\n", type);
-        printf("only available types: 'i' for int, 'd' for double\n");
+static void print_histograms(const FakeProcess* p) {
+    printf("CPU bursts:\n");
+    for (int i=0; i < p->max_quantum; ++i) {
+        printf("quantum %d:\t", i+1);
+        int cnt=0;
+        for (int j=0; j < p->cpu_d[i]; ++j) { printf("@"); cnt++; }
+        if (cnt < 8) printf("\t");  /* additional tab */
+        printf("\t%d\n", cnt);
+    }
+    printf("IO bursts:\n");
+    for (int i=0; i < p->max_quantum; ++i) {
+        printf("quantum %d:\t", i+1);
+        int cnt=0;
+        for (int j=0; j < p->io_d[i]; ++j) { printf("@"); cnt++; }
+        if (cnt < 8) printf("\t");  /* additional tab */
+        printf("\t%d\n", cnt);
+    
     }
 }
 
-int generate_datasets(FakeProcess* p, const char* filename) {
+static void print_distributions(const FakeProcess* p) {
+    printf("CPU bursts:\n");
+    for (int i=0; i < p->max_quantum; ++i) {
+        printf("quantum %d:\t", i+1);
+        printf("%.2f\n", p->cpu_nd[i]);
+    }
+    printf("IO bursts:\n");
+    for (int i=0; i < p->max_quantum; ++i) {
+        printf("quantum %d:\t", i+1);
+        printf("%.2f\n", p->io_nd[i]);
+    }
+}
+
+void generate_datasets(FakeProcess* p, const char* filename) {
+    FakeProcess_init(p);
     FILE* f = fopen(filename, "r");
-    if (!f) return -1;
+    if (!f) return;
     char* buffer = 0;
     size_t line_length = 0;
     p->pid = -1;
     p->arrival_time = -1;
-    datasets_init(p);
-    int num_bursts = 0;
     while (getline(&buffer, &line_length, f) > 0) {
         int pid = -1;
         int arrival_time = -1;
@@ -102,36 +112,30 @@ int generate_datasets(FakeProcess* p, const char* filename) {
         num_tokens = sscanf(buffer, "CPU_BURST %d", &duration);
         if (num_tokens == 1) {
             p->cpu_d[duration-1]++;
-            num_bursts++;
             goto next_round;
         }
 
         num_tokens = sscanf(buffer, "IO_BURST %d", &duration);
         if (num_tokens == 1) {
             p->io_d[duration-1]++;
-            num_bursts++;
             goto next_round;
         }
 next_round:;
     }
     
     printf("********** HISTOGRAMS OF PROCESS %d **********\n", p->pid);
-    printf("cpu_d:\n"); print_histogram(p->cpu_d, 'i');
-    printf("io_d:\n"); print_histogram(p->io_d, 'i');
-    
+    print_histograms(p);
+
     normalize_datasets(p);
     printf("*** PROBABILITY DISTRIBUTIONS OF PROCESS %d ***\n", p->pid);
-    printf("cpu_nd:\n"); print_histogram(p->cpu_nd, 'd');
-    printf("io_nd:\n"); print_histogram(p->io_nd, 'd');
+    print_distributions(p);
     
     cumulative_distributions(p);
     printf("*** CUMULATIVE PROBABILITY DISTRIBUTIONS OF PROCESS %d ***\n", p->pid);
-    printf("cpu_nd:\n"); print_histogram(p->cpu_nd, 'd');
-    printf("io_nd:\n"); print_histogram(p->io_nd, 'd');
+    print_distributions(p);
 
     if (buffer) free(buffer);
     fclose(f);
-    return num_bursts;
 }
 
 int FakeProcess_load(FakeProcess* p, const char* filename) {
@@ -148,7 +152,6 @@ int FakeProcess_load(FakeProcess* p, const char* filename) {
         
         num_tokens = sscanf(buffer, "CPU_BURST %d", &duration);
         if (num_tokens == 1) {
-            //p->cpu_d[duration-1]++;
             ProcessEvent* e = (ProcessEvent*) malloc(sizeof(ProcessEvent));
             e->list.prev = e->list.next = 0;
             e->type = CPU;
@@ -160,7 +163,6 @@ int FakeProcess_load(FakeProcess* p, const char* filename) {
 
         num_tokens = sscanf(buffer, "IO_BURST %d", &duration);
         if (num_tokens == 1) {
-            //p->io_d[duration-1]++;
             ProcessEvent* e = (ProcessEvent*) malloc(sizeof(ProcessEvent));
             e->list.prev = e->list.next = 0;
             e->type = IO;

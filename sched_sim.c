@@ -35,6 +35,13 @@ void schedSJF(FakeOS* os, void *args_, int cpu_index) {
 int main(int argc, char **argv) {
     srand(time(NULL));    
     FakeOS_init(&os);
+    
+    /*
+    char flag = 'a';
+    while (flag != 'y' && flag != 'n') {
+        printf("generate random input files? (y/n): ");
+        scanf(" %c", &flag);
+    }*/
 
     int max_quantum;
     printf("enter the maximum duration of each burst: ");
@@ -48,20 +55,15 @@ int main(int argc, char **argv) {
     assert(quantum>=1 && "negative or null value has been entered");
     sjf_args.quantum = quantum;
     os.schedule_args = &sjf_args;
-    os.schedule_fn = schedSJF;
-     
-    char flag = 'a';
-    while (flag != 'y' && flag != 'n') {
-        printf("generate random input files? (y/n): ");
-        scanf(" %c", &flag);
-    }
+    os.schedule_fn = schedSJF; 
 
     for (int i=1; i < argc; ++i) {
         FakeProcess new_process;
         new_process.max_quantum = max_quantum;
 
-        if (flag == 'y')
-            generate_file(argv[i], i, os.num_bursts, new_process.max_quantum);
+        //if (flag == 'y')
+        //    generate_file(argv[i], i, os.num_bursts, new_process.max_quantum);
+        generate_file(argv[i], i, os.num_bursts, new_process.max_quantum);
         generate_datasets(&new_process, argv[i]);
         generate_samples(&new_process, os.num_bursts);
         char filename[50];
@@ -78,4 +80,5 @@ int main(int argc, char **argv) {
     printf("num processes in queue %d\n", os.processes.size);
     while(is_any_cpu_running(&os) || os.ready.first || os.waiting.first || os.processes.first)
         FakeOS_simStep(&os);
+    FakeOS_destroy(&os);
 }

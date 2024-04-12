@@ -27,9 +27,9 @@ void FakeOS_init(FakeOS* os) {
     for (int i=0; i < num_cpus; ++i) os->cpus[i].running = 0;
    
     int num_bursts; 
-    printf("enter the number of bursts that each process should compute: ");
+    printf("enter the number of events that each process should complete: ");
     scanf(" %d", &num_bursts);
-    assert(num_bursts > 0 && "a negative number of events is not feasible");
+    assert(num_bursts > 1 && "at least two events, one for each type");
     os->num_bursts = num_bursts;
 }
 
@@ -169,7 +169,9 @@ void FakeOS_simStep(FakeOS* os) {
     ++os->timer;
 }
 
-void FakeOS_destroy(FakeOS* os) {}
+void FakeOS_destroy(FakeOS* os) {
+    free(os->cpus); os->cpus=0;
+}
 
 int is_any_cpu_running(FakeOS* os) {
     for (int i=0; i < os->num_cpus; ++i)
@@ -290,4 +292,9 @@ io:
     }
 
     fclose(f);
+    // after generating the samples we needed, throw away the junk
+    free(p->io_nd); p->io_nd=0;
+    free(p->cpu_nd); p->cpu_nd=0;
+    free(p->io_d); p->io_d=0;
+    free(p->cpu_d); p->cpu_d=0;
 }

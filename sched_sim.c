@@ -36,18 +36,24 @@ int main(int argc, char **argv) {
     srand(time(NULL));    
     FakeOS_init(&os);
     
-    /*
+    int max_quantum;
     char flag = 'a';
     while (flag != 'y' && flag != 'n') {
-        printf("generate random input files? (y/n): ");
+        printf("generate random initial tasks for processes? (y/n): ");
         scanf(" %c", &flag);
-    }*/
+    }
+    
+    if (flag == 'n') {
+        max_quantum = 10;
+        printf("default maximum duration of a task set to %d\n", max_quantum);
+        goto not_draft;
+    }
 
-    int max_quantum;
-    printf("enter the maximum duration of each burst: ");
+    printf("enter the maximum duration of each task: ");
     scanf(" %d", &max_quantum);
     assert(max_quantum>=1 && "negative or null value has been entered");
-    
+
+not_draft:
     SchedSJFArgs sjf_args;
     int quantum;
     printf("enter the quantum: ");
@@ -61,8 +67,8 @@ int main(int argc, char **argv) {
         FakeProcess new_process;
         new_process.max_quantum = max_quantum;
 
-        //if (flag == 'y')
-        //    generate_file(argv[i], i, os.num_bursts, new_process.max_quantum);
+        if (flag == 'y')
+            generate_file(argv[i], i, os.num_bursts, new_process.max_quantum);
         generate_file(argv[i], i, os.num_bursts, new_process.max_quantum);
         generate_datasets(&new_process, argv[i]);
         generate_samples(&new_process, os.num_bursts);

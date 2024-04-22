@@ -270,7 +270,7 @@ void generate_samples(FakeProcess* p, int num_bursts) {
         for (int j=1; j < p->max_quantum; ++j) {
             double y1 = p->cpu_nd[j-1];
             double y2 = p->cpu_nd[j];
-            if (y1<y && y<y2) {
+            if (y<y1 || (y1<y && y<y2)) {
                 fprintf(f, "CPU_BURST\t%d\n", j+1);
                 break;
             }

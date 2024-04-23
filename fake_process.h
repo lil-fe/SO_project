@@ -22,6 +22,7 @@ typedef struct FakeProcess {
     // max_quantum determines the "size" of the histogram,
     // namely how many durations (quantum of duration 1, 2, ...)
     int max_quantum;
+    int num_bursts;     /* number of bursts to be generated */
 } FakeProcess;
 
 int FakeProcess_load(FakeProcess*, const char *filename);

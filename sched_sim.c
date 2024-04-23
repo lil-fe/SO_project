@@ -36,22 +36,22 @@ int main(int argc, char **argv) {
     srand(time(NULL));    
     FakeOS_init(&os);
     
-    int max_quantum;
+    int max_quantum, num_bursts;
     char flag = 'a';
     while (flag != 'y' && flag != 'n') {
         printf("generate random initial tasks for processes? (y/n): ");
         scanf(" %c", &flag);
     }
     
-    if (flag == 'n') {
-        max_quantum = 10;
-        printf("default maximum duration of a task set to %d\n", max_quantum);
-        goto not_draft;
-    }
+    if (flag == 'n') goto not_draft;
 
     printf("enter the maximum duration of each task: ");
     scanf(" %d", &max_quantum);
     assert(max_quantum>=1 && "negative or null value has been entered");
+
+    printf("enter the number of events that each process should complete: ");
+    scanf(" %d", &num_bursts);
+    assert(num_bursts > 1 && "at least two events, one for each type");
 
 not_draft:
     SchedSJFArgs sjf_args;
@@ -65,13 +65,16 @@ not_draft:
 
     for (int i=1; i < argc; ++i) {
         FakeProcess new_process;
-        new_process.max_quantum = max_quantum;
+        if (flag == 'y') {
+            new_process.max_quantum = max_quantum;
+            new_process.num_bursts = num_bursts;
+            generate_file(argv[i], i, new_process.num_bursts, new_process.max_quantum);
+        } else {
+            scan_file(&new_process, argv[i]);
+        }
 
-        if (flag == 'y')
-            generate_file(argv[i], i, os.num_bursts, new_process.max_quantum);
-        generate_file(argv[i], i, os.num_bursts, new_process.max_quantum);
         generate_datasets(&new_process, argv[i]);
-        generate_samples(&new_process, os.num_bursts);
+        generate_samples(&new_process, new_process.num_bursts);
         char filename[50];
         sprintf(filename, "processes/sampled_p%d.txt", i);
         int num_events = FakeProcess_load(&new_process, filename);

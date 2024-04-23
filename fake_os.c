@@ -24,13 +24,7 @@ void FakeOS_init(FakeOS* os) {
     }
     os->num_cpus = num_cpus;
     os->cpus = (FakeCPU*) malloc(sizeof(FakeCPU) * os->num_cpus);
-    for (int i=0; i < num_cpus; ++i) os->cpus[i].running = 0;
-   
-    int num_bursts; 
-    printf("enter the number of events that each process should complete: ");
-    scanf(" %d", &num_bursts);
-    assert(num_bursts > 1 && "at least two events, one for each type");
-    os->num_bursts = num_bursts;
+    for (int i=0; i < num_cpus; ++i) os->cpus[i].running = 0;   
 }
 
 void FakeOS_createProcess(FakeOS* os, FakeProcess* p) {
@@ -183,10 +177,16 @@ int is_any_cpu_running(FakeOS* os) {
  * actual_burst: the actual burst time of the process;
  * predicted_burst: the previously predicted burst time, namely at time t.
  * The prediction result is the predicted burst at time t+1. */
-float prediction(FakePCB* pcb) {
+/*float prediction(FakePCB* pcb) {
     if (!pcb->predicted_burst)
         pcb->predicted_burst = pcb->actual_burst;
     return A*pcb->predicted_burst + (1-A)*pcb->actual_burst;
+}*/
+
+float prediction(FakePCB* pcb) {
+    if (!pcb->predicted_burst)
+        pcb->predicted_burst = pcb->actual_burst;
+    return A*pcb->actual_burst + (1-A)*pcb->predicted_burst;
 }
 
 FakePCB* findShortestJob(ListHead* ready) {
@@ -297,4 +297,36 @@ io:
     free(p->cpu_nd); p->cpu_nd=0;
     free(p->io_d); p->io_d=0;
     free(p->cpu_d); p->cpu_d=0;
+}
+
+/* function to get max_quantum and num_bursts */
+void scan_file(FakeProcess* p, const char* filename) {
+    FILE* f = fopen(filename, "r");
+    if (!f) return;
+    char* buffer = 0;
+    size_t line_length = 0;
+    int max_quantum = 0;
+    int num_bursts = 0;
+    while (getline(&buffer, &line_length, f) > 0) {
+        int num_tokens = 0;
+        int duration = 0;
+
+        num_tokens = sscanf(buffer, "CPU_BURST %d", &duration);
+        if (num_tokens == 1) {
+            num_bursts++;
+            if (max_quantum < duration)
+                max_quantum = duration;
+        }
+
+        num_tokens = sscanf(buffer, "IO_BURST %d", &duration);
+        if (num_tokens == 1) {
+            num_bursts++;
+            if (max_quantum < duration)
+                max_quantum = duration;
+        }
+    }
+    
+    p->max_quantum = max_quantum;
+    p->num_bursts = num_bursts;
+    fclose(f);
 }

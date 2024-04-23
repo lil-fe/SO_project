@@ -177,12 +177,6 @@ int is_any_cpu_running(FakeOS* os) {
  * actual_burst: the actual burst time of the process;
  * predicted_burst: the previously predicted burst time, namely at time t.
  * The prediction result is the predicted burst at time t+1. */
-/*float prediction(FakePCB* pcb) {
-    if (!pcb->predicted_burst)
-        pcb->predicted_burst = pcb->actual_burst;
-    return A*pcb->predicted_burst + (1-A)*pcb->actual_burst;
-}*/
-
 float prediction(FakePCB* pcb) {
     if (!pcb->predicted_burst)
         pcb->predicted_burst = pcb->actual_burst;
@@ -251,7 +245,7 @@ void generate_file(const char* filename, int pid, int num_bursts,
  * writes them to a file. Each burst duration is randomly sampled based
  * on their cumulative probability distributions.
  */
-void generate_samples(FakeProcess* p, int num_bursts) {
+void generate_samples(FakeProcess* p) {
     char filename[50];
     sprintf(filename, "processes/sampled_p%d.txt", p->pid);
     FILE* f = fopen(filename, "w");
@@ -261,7 +255,7 @@ void generate_samples(FakeProcess* p, int num_bursts) {
     if (!ftell(f)) 
         fprintf(f, "PROCESS %d %d\n", p->pid, p->arrival_time);
 
-    for(int i=0; i < num_bursts/2; ++i) {
+    for(int i=0; i < p->num_bursts/2; ++i) {
         double y = (double) rand() / RAND_MAX;
         if (y < p->cpu_nd[0]) {
             fprintf(f, "CPU_BURST\t%d\n", 1);

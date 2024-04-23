@@ -43,4 +43,4 @@ void scan_file(FakeProcess*, const char* filename);
 
 void generate_file(const char* filename, int pid, int num_bursts, 
         int max_quantum);
-void generate_samples(FakeProcess* p, int num_bursts);
+void generate_samples(FakeProcess* p);

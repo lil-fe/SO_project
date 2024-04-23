@@ -74,7 +74,7 @@ not_draft:
         }
 
         generate_datasets(&new_process, argv[i]);
-        generate_samples(&new_process, new_process.num_bursts);
+        generate_samples(&new_process);
         char filename[50];
         sprintf(filename, "processes/sampled_p%d.txt", i);
         int num_events = FakeProcess_load(&new_process, filename);

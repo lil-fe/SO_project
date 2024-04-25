@@ -17,6 +17,7 @@ void schedSJF(FakeOS* os, void *args_, int cpu_index) {
     if (!shortest_job) return;      /* no process found */
     os->cpus[cpu_index].running = shortest_job; 
     shortest_job->actual_burst = 0;
+    shortest_job->predicted = 0;
     List_detach(&os->ready, (ListItem*) shortest_job);
     ProcessEvent* e = (ProcessEvent*)shortest_job->events.first;
     /* if e->duration > quantum, then prepend to the events' list of this process 

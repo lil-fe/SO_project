@@ -4,7 +4,7 @@
 #include <float.h>
 #include "fake_os.h"
 
-#define A 0.5
+#define A 0.4
 
 void FakeOS_init(FakeOS* os) {
     os->running = 0;
@@ -180,7 +180,8 @@ int is_any_cpu_running(FakeOS* os) {
 float prediction(FakePCB* pcb) {
     if (!pcb->predicted_burst)
         pcb->predicted_burst = pcb->actual_burst;
-    return A*pcb->actual_burst + (1-A)*pcb->predicted_burst;
+    return !pcb->predicted ?
+        A*pcb->actual_burst + (1-A)*pcb->predicted_burst : pcb->predicted_burst;
 }
 
 FakePCB* findShortestJob(ListHead* ready) {
@@ -190,7 +191,8 @@ FakePCB* findShortestJob(ListHead* ready) {
     while (aux) {
         FakePCB* pcb = (FakePCB*) aux;
         float predicted_burst = prediction(pcb);
-        
+        pcb->predicted = 1;
+
         if (predicted_burst != 0)
             printf("\t\t[pid %d] predicted_burst: %.2f\n", pcb->pid, predicted_burst);
         

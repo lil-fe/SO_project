@@ -9,6 +9,7 @@ typedef struct {
 
     float actual_burst;
     float predicted_burst;
+    short predicted;
 } FakePCB;
 
 struct FakeOS;
